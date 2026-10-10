@@ -1,0 +1,20 @@
+let folders=[],files=[];
+let folderId=null;
+const search=document.querySelector('#search'),sort=document.querySelector('#sort');
+function render(){
+ const query=search.value.trim().toLocaleLowerCase('th');
+ const folderContainer=document.querySelector('#folders');folderContainer.replaceChildren();
+ folders.filter(folder=>!query||folder.name.toLocaleLowerCase('th').includes(query)).forEach(folder=>{const button=document.createElement('button');button.textContent='▱ '+folder.name;button.className=folderId===folder.id?'folderactive':'';button.addEventListener('click',()=>{folderId=folder.id;render();});folderContainer.append(button);});
+ const all=document.querySelector('#allFiles');all.classList.toggle('folderactive',folderId===null);all.setAttribute('aria-pressed',String(folderId===null));document.querySelector('#allCount').textContent=files.length;
+ document.querySelector('#noFolders').hidden=folderContainer.childElementCount>0;
+ document.querySelector('#noFolders').textContent=query&&folders.length?'ไม่พบโฟลเดอร์ที่ค้นหา':'ยังไม่มีโฟลเดอร์';
+ const currentFolder=folders.find(folder=>folder.id===folderId);
+ const filtered=files.filter(file=>(folderId===null||file.folderId===folderId)&&(file.name+' '+(folders.find(folder=>folder.id===file.folderId)?.name||'')).toLocaleLowerCase('th').includes(query)).sort((a,b)=>sort.value==='name'?a.name.localeCompare(b.name,'th'):new Date(b.createdAt)-new Date(a.createdAt));
+ document.querySelector('#sectionTitle').textContent=currentFolder?.name||'ไฟล์ทั้งหมด';document.querySelector('#fileCount').textContent=filtered.length+' ไฟล์';
+ const rows=document.querySelector('#fileRows');rows.replaceChildren();filtered.forEach(file=>{const row=document.createElement('tr');[file.name,folders.find(folder=>folder.id===file.folderId)?.name||'ทั่วไป',new Date(file.createdAt).toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok'})].forEach(value=>{const cell=document.createElement('td');cell.textContent=value;row.append(cell);});const action=document.createElement('td');const link=document.createElement('a');link.textContent='↓ ดาวน์โหลด';link.href='#';link.setAttribute('aria-label','ดาวน์โหลด '+file.name);link.addEventListener('click',async event=>{event.preventDefault();if(!sessionStorage.getItem('vc-session')){location.href='login.html';return;}try{const data=await VC_API.call('download',{id:file.id});const bytes=Uint8Array.from(atob(data.base64),c=>c.charCodeAt(0));const url=URL.createObjectURL(new Blob([bytes],{type:data.mime}));const download=document.createElement('a');download.href=url;download.download=data.name;download.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){alert(e.message);}});action.append(link);row.append(action);rows.append(row);});
+ document.querySelector('#empty').hidden=filtered.length>0;document.querySelector('#emptyTitle').textContent=query?'ไม่พบไฟล์ที่ค้นหา':'ยังไม่มีไฟล์เอกสาร';document.querySelector('#emptyText').textContent=query?'ลองเปลี่ยนคำค้นหาหรือดูไฟล์ทั้งหมด':'เอกสารที่ผู้ดูแลเพิ่มจะแสดงที่นี่';document.querySelector('#reset').hidden=!query&&folderId===null;
+}
+search.addEventListener('input',render);sort.addEventListener('change',render);document.querySelector('#allFiles').addEventListener('click',()=>{folderId=null;render();});document.querySelector('#reset').addEventListener('click',()=>{folderId=null;search.value='';render();});const dialog=document.querySelector('#manageDialog');document.querySelector('#manage').addEventListener('click',()=>{window.location.href='cms.html#files';});document.querySelector('#closeManage').addEventListener('click',()=>dialog.close());render();
+
+async function loadFiles(){try{const data=await VC_API.call('load');folders=data.folders;files=data.files;render();document.querySelector('.infobar div').textContent='เอกสารและโฟลเดอร์จากผู้ดูแล · สมาชิกเข้าสู่ระบบเพื่อดาวน์โหลดไฟล์';}catch(e){document.querySelector('#emptyTitle').textContent='โหลดเอกสารไม่สำเร็จ';document.querySelector('#emptyText').textContent=e.message;}}
+loadFiles();
